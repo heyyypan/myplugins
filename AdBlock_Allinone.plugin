@@ -1,7 +1,7 @@
 #!name=广告拦截&净化合集
 #!desc=(支持约730款APP/小程序)针对部分APP和小程序广告进行拦截，某些APP要清除缓存或者重新安装拦截广告才会生效！规则明细可以查看本插件的注释
 #!icon=https://raw.giteeusercontent.com/heypan/app-icons/raw/master/120px/RemoveAds.png
-#!date=2026-10-01-1608
+#!date=2026-10-01-1609
 #!remark=下方的所有规则都标注了对应的hostname，可能存在错误或者遗漏，欢迎反馈。对于无法/可选MITM的hostname都特别做了“如开启可自行添加主机名”提示，如果提示后面没有标注主机名则包含所有主机名，否则只包含提示语后面的主机名。
 
 
