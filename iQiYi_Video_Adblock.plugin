@@ -1,0 +1,104 @@
+#!name=爱奇艺APP去广告
+#!desc=移除开屏广告、焦点图广告、瀑布流广告、搜索页面广告、移除青少年弹窗，精简底栏和我的页面。
+#!icon=https://raw.giteeusercontent.com/heypan/app-icons/raw/master/120px/iQiYi_Video.png
+#!date=2026-10-31-2130
+#!loon_version=3.5.1(998)
+
+
+
+
+
+
+[Rule]
+# 屏蔽爱奇艺广告相关服务器 IP
+IP-CIDR,103.44.59.54/32,REJECT,no-resolve
+# 屏蔽爱奇艺广告相关服务器 IP
+IP-CIDR,111.63.147.158/32,REJECT,no-resolve
+# 屏蔽爱奇艺广告相关服务器 IP
+IP-CIDR,116.211.198.237/32,REJECT,no-resolve
+# cupid 广告域名直连（配合下方复写处理广告位数据，避免请求失败导致异常）
+DOMAIN-SUFFIX,cupid.iqiyi.com,DIRECT
+# 屏蔽 api.iqiyi.com（广告/统计接口）
+DOMAIN,api.iqiyi.com,REJECT
+# 屏蔽 access.if.iqiyi.com（广告/统计接口）
+DOMAIN,access.if.iqiyi.com,REJECT
+
+
+
+
+
+
+
+[Rewrite]
+# 1. 首页：删除 base.statistics 统计/广告字符串字段
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/views_home\/3\.0\/qy_home\?/i then response.json.delete("base.statistics")
+
+# 2. 首页：移除顶部焦点图(focus)、信息流广告(ad_mobile_flow)、广告视频(ad_trueview)卡片
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/views_home\/3\.0\/qy_home\?/i then response.json.jq("del(.cards[] | select(.alias_name == \"focus\" or .alias_name == \"ad_mobile_flow\" or .alias_name == \"ad_trueview\"))")
+
+# 3. 分类页：移除统计广告字段、入口焦点图(entrence_focus)和广告视频(ad_trueview)卡片
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/views_category\/3\.0\/category_home\?/i then response.json.jq("del(.base.statistics | select(.ad_str)) | del(.cards[] | select(.alias_name == \"entrence_focus\" or .alias_name == \"ad_trueview\"))")
+
+# 4. 瀑布流(推荐信息流)：移除统计广告字段及所有带 block_class 的广告区块
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/waterfall(-plt)?\/3\.0\/feed\?/i then response.json.jq("del(.base.statistics | select(.ad_str)) | del(.. | select(.block_class?))")
+
+# 5. 播放页标签：删除活动标签(activity_tab)
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/views_plt\/3\.0\/player_tabs_v2\?/i then response.json.delete("kv_pair.activity_tab")
+
+# 6. 播放页标签：移除会员推广、标签、聊天入口、非会员广告、竖版短视频、说唱、专题、瀑布流推荐等卡片及广告区块
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/views_plt\/3\.0\/player_tabs_v2\?/i then response.json.jq("del(.cards[] | select(.alias_name == \"play_vip_promotion\" or .alias_name == \"play_detail_tag\" or .alias_name == \"play_chat_entrance\" or .alias_name == \"play_ad_no_vip\" or .alias_name == \"play_vertical_short_video\" or .alias_name == \"play_rap_custom\" or .alias_name == \"play_topical_tab\" or .alias_name == \"play_vertical\" or .alias_name == \"play_water_fall_like\")) | del(.. | select(.block_class?))")
+
+# 7. 长视频评论区：jq 空过滤（原规则保留，与第 14 条同接口，用于清理评论区异常数据）
+response if ${url} ~= /^https:\/\/comment-card\.iqiyi\.com\/views_comment\/3\.0\/long_video_comments\?/i then response.json.jq("")
+
+# 8. 搜索页热搜：移除搜索广告卡片(ad_trueview/ad_mobile_flow/search_mid_text_ad)及统计广告字段
+response if ${url} ~= /^https:\/\/cards\.iqiyi\.com\/views_search\/3\.0\/hot_query_search\?/i then response.json.jq(".cards |= map(select(.alias_name as $name | $name != \"ad_trueview\" and $name != \"ad_mobile_flow\" and $name != \"search_mid_text_ad\")) | if .base.statistics.ad_str? then del(.base.statistics) else . end")
+
+# 9. 拦截 App 初始化代理接口（去除开屏等初始化广告配置）
+request if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/control\/3\.0\/init_proxy\?/i then reject_dict(200)
+
+# 10. 拦截会员活动互动弹窗接口
+request if ${url} ~= /^https?:\/\/act\.vip\.iqiyi\.com\/interact\/api\/v2\/show\?/i then reject_dict(200)
+
+# 11. 拦截视频互动(互动广告/浮层)数据接口
+request if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/ivos\/interact\/video\/data\?/i then reject_dict(200)
+
+# 12. 拦截视频接口代理（去除播放相关广告/推广配置）
+request if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/video\/3\.0\/v_interface_proxy\?/i then reject_dict(200)
+
+# 13. 拦截弹窗控制接口（青少年模式等弹窗）
+request if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_pop\/3\.0\/pop_control\?/i then reject_dict(200)
+
+# 14. 长视频评论区：仅保留带 alias_name 的卡片，过滤评论区内嵌广告
+response if ${url} ~= /^https?:\/\/comment-card\.iqiyi\.com\/views_comment\/3\.0\/long_video_comments\?/i then response.json.jq(".cards |= map(select(has(\"alias_name\")))")
+
+# 15. 底栏主题：删除主题列表(theme_list)
+response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_menus\/3\.0\/bottom_theme\?/i then response.json.delete("theme_list")
+
+# 16. 底栏精简：仅保留「推荐(rec)」和「我的(my)」两个标签
+response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_menus\/3\.0\/bottom_theme\?/i then response.json.jq(".cards |= map(.items |= map(select(.other.bottom_tab_type == \"rec\" or .other.bottom_tab_type == \"my\")))")
+
+# 17. 首页顶部菜单精简：仅保留指定的导航项（0、2、1007、1、6、3）
+response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_menus\/3\.0\/home_top_menu\?/i then response.json.jq(".nav_group_data[].nav_list |= map(select(. == \"0\" or . == \"2\" or . == \"1007\" or . == \"1\" or . == \"6\" or . == \"3\"))")
+
+# 18. 通用开关：删除投屏设备广告资源(cast_device_ad)
+response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/fusion\/3\.0\/common_switch\?/i then response.json.delete("content.resource.cast_device_ad")
+
+# 19. 通用开关：将 App 广告开关/时长、预告广告提示、广告下载、4G 焦点图视频播放次数等全部置为 0，关闭广告
+response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/fusion\/3\.0\/common_switch\?/i then response.json.replace(["content.switchs.app_ad.app_ad_enable", "content.switchs.app_ad.app_ad_duration", "content.switchs.ios_tech.kPreadAdHintSwitch", "content.switchs.ios_tech.ad_download", "content.switchs.m_qiyi_ios_tech.KFocusAdVideoPlayTimesIn4G"], [0, 0, 0, 0, 0])
+
+# 20. cupid 广告混合接口：删除广告位(adSlots)，去除开屏/贴片等广告
+response if ${url} ~= /^https?:\/\/(kjp|t7z)\.cupid\.iqiyi\.com\/mixer\?/i then response.json.delete("adSlots")
+
+# 21. 搜索结果接口：删除 data，去除搜索页广告内容
+response if ${url} ~= /^https?:\/\/search\.video\.iqiyi\.com\/q\?/i then response.json.delete("data")
+
+# 22. 「我的」页面精简：移除 wd_liebiao_2 区块及包含 wd_liebiao_3 的菜单项
+response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/aggregate\/3\.0\/getMyMenus\?/i then response.json.jq(".data |= map(select(.statistic.block != \"wd_liebiao_2\") | select(all(.menuList[]?.statistic2.block; . != \"wd_liebiao_3\")))")
+
+
+
+
+
+[MITM]
+hostname = -i.vip.iqiyi.com, *.iqiyi.com
