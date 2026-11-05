@@ -1,10 +1,8 @@
 #!name=爱奇艺APP去广告
 #!desc=移除开屏广告、焦点图广告、瀑布流广告、搜索页面广告、移除青少年弹窗，精简底栏和我的页面。
 #!icon=https://raw.giteeusercontent.com/heypan/app-icons/raw/master/120px/iQiYi_Video.png
-#!date=2026-10-31-2130
+#!date=2026-11-05-1210
 #!loon_version=3.5.1(998)
-
-
 
 
 
@@ -22,9 +20,6 @@ DOMAIN-SUFFIX,cupid.iqiyi.com,DIRECT
 DOMAIN,api.iqiyi.com,REJECT
 # 屏蔽 access.if.iqiyi.com（广告/统计接口）
 DOMAIN,access.if.iqiyi.com,REJECT
-
-
-
 
 
 
@@ -78,24 +73,20 @@ response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_menus\/3\.0\/bottom
 # 16. 底栏精简：仅保留「推荐(rec)」和「我的(my)」两个标签
 response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_menus\/3\.0\/bottom_theme\?/i then response.json.jq(".cards |= map(.items |= map(select(.other.bottom_tab_type == \"rec\" or .other.bottom_tab_type == \"my\")))")
 
-# 17. 首页顶部菜单精简：仅保留指定的导航项（0、2、1007、1、6、3）
-response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/views_menus\/3\.0\/home_top_menu\?/i then response.json.jq(".nav_group_data[].nav_list |= map(select(. == \"0\" or . == \"2\" or . == \"1007\" or . == \"1\" or . == \"6\" or . == \"3\"))")
-
-# 18. 通用开关：删除投屏设备广告资源(cast_device_ad)
+# 17. 通用开关：删除投屏设备广告资源(cast_device_ad)
 response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/fusion\/3\.0\/common_switch\?/i then response.json.delete("content.resource.cast_device_ad")
 
-# 19. 通用开关：将 App 广告开关/时长、预告广告提示、广告下载、4G 焦点图视频播放次数等全部置为 0，关闭广告
+# 18. 通用开关：将 App 广告开关/时长、预告广告提示、广告下载、4G 焦点图视频播放次数等全部置为 0，关闭广告
 response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/fusion\/3\.0\/common_switch\?/i then response.json.replace(["content.switchs.app_ad.app_ad_enable", "content.switchs.app_ad.app_ad_duration", "content.switchs.ios_tech.kPreadAdHintSwitch", "content.switchs.ios_tech.ad_download", "content.switchs.m_qiyi_ios_tech.KFocusAdVideoPlayTimesIn4G"], [0, 0, 0, 0, 0])
 
-# 20. cupid 广告混合接口：删除广告位(adSlots)，去除开屏/贴片等广告
+# 19. cupid 广告混合接口：删除广告位(adSlots)，去除开屏/贴片等广告
 response if ${url} ~= /^https?:\/\/(kjp|t7z)\.cupid\.iqiyi\.com\/mixer\?/i then response.json.delete("adSlots")
 
-# 21. 搜索结果接口：删除 data，去除搜索页广告内容
+# 20. 搜索结果接口：删除 data，去除搜索页广告内容
 response if ${url} ~= /^https?:\/\/search\.video\.iqiyi\.com\/q\?/i then response.json.delete("data")
 
-# 22. 「我的」页面精简：移除 wd_liebiao_2 区块及包含 wd_liebiao_3 的菜单项
+# 21. 「我的」页面精简：移除 wd_liebiao_2 区块及包含 wd_liebiao_3 的菜单项
 response if ${url} ~= /^https?:\/\/iface2\.iqiyi\.com\/aggregate\/3\.0\/getMyMenus\?/i then response.json.jq(".data |= map(select(.statistic.block != \"wd_liebiao_2\") | select(all(.menuList[]?.statistic2.block; . != \"wd_liebiao_3\")))")
-
 
 
 
